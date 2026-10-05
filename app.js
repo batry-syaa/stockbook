@@ -43,8 +43,75 @@
   function calc(x){var t=x.o+x.n-x.d;return {total:t,shelf:t-x.b+x.r,lost:x.b-x.r}}
   function find(id){return books.filter(function(b){return b.id===id})[0]}
 
+  /* ---------- Muat turun / Cetak ---------- */
+  var HEAD=["Tahun","Jenis","Tajuk buku","Stok lama","Stok baru","Pinjaman","Pulang","Rosak / lupus","Jumlah","Di rak","Hilang"];
+  var pa=document.createElement("div");pa.id="printarea";document.body.appendChild(pa);
+  window.addEventListener("afterprint",function(){document.body.classList.remove("print-table")});
+  function sortList(l){return l.slice().sort(function(a,b){return a.y-b.y||TYPES.indexOf(a.ty)-TYPES.indexOf(b.ty)||(a.ts||0)-(b.ts||0)})}
+  function rowsFor(l){return l.map(function(b){var c=calc(b);return [b.y,b.ty,b.t,b.o,b.n,b.b,b.r,b.d,c.total,c.shelf,c.lost]})}
+  function withTotals(rows){
+    var t=["","","Jumlah semua"];
+    for(var i=3;i<HEAD.length;i++){var n=0;rows.forEach(function(r){n+=r[i]});t.push(n)}
+    return rows.concat([t]);
+  }
+  function fname(y,bk){
+    if(bk)return "buku-stok-"+(bk.t||"buku").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")+"-tahun-"+bk.y;
+    return "buku-stok-spbt-"+(y?"tahun-"+y:"semua");
+  }
+  function download(blob,name){
+    var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;
+    document.body.appendChild(a);a.click();
+    setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},500);
+  }
+  function toCSV(rows){
+    return "\ufeff"+[HEAD].concat(rows).map(function(r){
+      return r.map(function(v){v=String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(",");
+    }).join("\r\n");
+  }
+  function loadXLSX(){
+    return new Promise(function(res,rej){
+      if(window.XLSX)return res(window.XLSX);
+      var sc=document.createElement("script");
+      sc.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+      sc.onload=function(){res(window.XLSX)};sc.onerror=rej;document.head.appendChild(sc);
+    });
+  }
+  function doExport(kind,y,id){
+    var bk=id?find(id):null;
+    if(id&&!bk)return;
+    var list=bk?[bk]:sortList(y?books.filter(function(b){return b.y===y}):books);
+    if(kind==="csv"){
+      download(new Blob([toCSV(withTotals(rowsFor(list)))],{type:"text/csv;charset=utf-8"}),fname(y,bk)+".csv");
+    }else if(kind==="xlsx"){
+      loadXLSX().then(function(X){
+        var wb=X.utils.book_new(),ys=bk?[bk.y]:y?[y]:[1,2,3,4,5,6].filter(function(n){return books.some(function(b){return b.y===n})});
+        if(!ys.length)ys=[1];
+        ys.forEach(function(yy){
+          var ws=X.utils.aoa_to_sheet([HEAD].concat(withTotals(rowsFor(bk?[bk]:sortList(books.filter(function(b){return b.y===yy}))))));
+          ws["!cols"]=[8,14,32,11,11,11,9,14,9,9,9].map(function(w){return {wch:w}});
+          X.utils.book_append_sheet(wb,ws,"Tahun "+yy);
+        });
+        X.writeFile(wb,fname(y,bk)+".xlsx");
+      }).catch(function(){alert("Excel tidak dapat dimuatkan. Sila guna pilihan CSV (boleh dibuka dalam Excel).")});
+    }else{
+      var rows=withTotals(rowsFor(list));
+      pa.innerHTML='<h1>Buku Stok SPBT'+(bk?' &ndash; '+esc(bk.t)+' (Tahun '+bk.y+')':y?' &ndash; Tahun '+y:'')+'</h1><p>Dicetak: '+new Date().toLocaleDateString("ms-MY")+'</p><table><thead><tr>'+
+        HEAD.map(function(h){return '<th>'+h+'</th>'}).join("")+'</tr></thead><tbody>'+
+        rows.map(function(r,i){return '<tr'+(i===rows.length-1?' class="tot"':'')+'>'+r.map(function(v,j){return '<td'+(j===2?' class="l"':'')+'>'+esc(v)+'</td>'}).join("")+'</tr>'}).join("")+'</tbody></table>';
+      document.body.classList.add("print-table");
+      setTimeout(function(){window.print()},60);
+    }
+  }
+  function menuHTML(y,id,label){
+    return '<details class="exp" data-y="'+(y||0)+'" data-b="'+(id||"")+'"><summary>'+(label||"Muat turun / Cetak")+'</summary><div class="menu">'+
+      '<button type="button" data-x="xlsx">Excel (.xlsx)</button>'+
+      '<button type="button" data-x="csv">CSV (buka dalam Excel)</button>'+
+      '<button type="button" data-x="pdf">PDF / Cetak</button>'+
+      '<small>Untuk PDF, pilih "Save as PDF" pada dialog cetak.</small></div></details>';
+  }
+
   function home(){
-    var h='<div class="hero"><div class="logo"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5"/><path d="M9 8h7"/></svg></div><h1>Buku Stok SPBT</h1></div><p class="sub">Pilih tahun untuk lihat senarai buku teks dan buku aktiviti.</p><div class="years">';
+    var h='<div class="hero"><div class="logo"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5"/><path d="M9 8h7"/></svg></div><h1>Buku Stok SPBT</h1></div><p class="sub">Pilih tahun untuk lihat senarai buku teks dan buku aktiviti.</p>'+menuHTML(0)+'<div class="years">';
     for(var y=1;y<=6;y++){
       var l=books.filter(function(b){return b.y===y}), s=0;
       l.forEach(function(b){s+=calc(b).shelf});
@@ -60,7 +127,7 @@
       '<form class="addbar" id="add"><input id="nt" type="text" placeholder="Nama buku baru" aria-label="Nama buku baru" required>'+
       '<select id="nty" aria-label="Jenis buku">'+TYPES.map(function(t){return '<option>'+t+'</option>'}).join("")+'</select>'+
       '<button type="submit">+ Tambah</button></form>'+
-      '<div class="seg" role="group" aria-label="Paparan"><button type="button" data-m="list" class="'+(mode==="list"?"on":"")+'">Senarai</button><button type="button" data-m="table" class="'+(mode==="table"?"on":"")+'">Jadual (semua)</button></div>';
+      '<div class="seg" role="group" aria-label="Paparan"><button type="button" data-m="list" class="'+(mode==="list"?"on":"")+'">Senarai</button><button type="button" data-m="table" class="'+(mode==="table"?"on":"")+'">Jadual (semua)</button></div>'+menuHTML(y);
     if(mode==="table"){
       h+='<div class="tbl"><table><thead><tr><th>Tajuk buku</th><th>Jenis</th>'+FIELDS.map(function(f){return '<th>'+f[1]+'</th>'}).join("")+'<th>Jumlah</th><th>Di rak</th><th>Hilang</th></tr></thead><tbody>';
       var sorted=TYPES.reduce(function(acc,ty){return acc.concat(yb.filter(function(b){return b.ty===ty}))},[]);
@@ -115,13 +182,12 @@
     FIELDS.forEach(function(f){h+='<label>'+f[1]+' <small>('+f[2]+')</small><input type="number" min="0" inputmode="numeric" data-k="'+f[0]+'" value="'+b[f[0]]+'"></label>'});
     h+='</div><div class="res"><div class="r"><span>Jumlah keseluruhan</span><b id="rt"></b></div><div class="r"><span>Di rak (baki)</span><b id="rs"></b></div><div class="r lost"><span>Hilang oleh murid</span><b id="rl"></b></div></div>'+
       '<p class="note">Jumlah = stok lama + stok baru &minus; rosak. Di rak = jumlah &minus; pinjaman + pulang. Hilang = pinjaman &minus; pulang.</p>'+
-      '<div class="actions"><button class="soft" id="pr">Cetak</button><button class="del" id="dl">Padam buku</button></div></div>';
+      '<div class="actions">'+menuHTML(b.y,b.id,"Cetak / Muat turun")+'<button class="del" id="dl">Padam buku</button></div></div>';
     app.innerHTML=h;
     function upd(){var c=calc(b);document.getElementById("rt").textContent=c.total;document.getElementById("rs").textContent=c.shelf;document.getElementById("rl").textContent=c.lost}
     upd();
     document.getElementById("bt").addEventListener("input",function(e){b.t=e.target.value;save()});
     app.querySelectorAll("input[data-k]").forEach(function(el){el.addEventListener("input",function(){b[el.getAttribute("data-k")]=num(el.value);save();upd()})});
-    document.getElementById("pr").addEventListener("click",function(){window.print()});
     document.getElementById("dl").addEventListener("click",function(){
       if(confirm("Padam buku ini?")){books=books.filter(function(x){return x.id!==id});save();nav("#/year/"+b.y)}
     });
@@ -142,6 +208,13 @@
     var a=e.target.closest&&e.target.closest("a[href^='#/']");
     if(!a)return;
     e.preventDefault();nav(a.getAttribute("href"));
+  });
+  app.addEventListener("click",function(e){
+    var x=e.target.closest&&e.target.closest("[data-x]");
+    if(!x)return;
+    var d=x.closest("details");
+    doExport(x.getAttribute("data-x"),+d.getAttribute("data-y")||0,d.getAttribute("data-b")||"");
+    d.open=false;
   });
   window.addEventListener("hashchange",function(){
     var h=location.hash||"#/";
