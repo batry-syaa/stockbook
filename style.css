@@ -101,4 +101,31 @@ label small{font-weight:600;color:var(--muted)}
   .year em{font-size:2.8rem}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
-@media print{.back,.actions,.addbar{display:none}body{background:#fff}}
+
+
+.exp{display:inline-block;position:relative;margin:18px 0 4px 10px;vertical-align:top}
+.sub+.exp{margin:0 0 20px}
+.exp summary{list-style:none;cursor:pointer;display:inline-block;padding:11px 18px;border-radius:99px;background:var(--lav);color:var(--deep);font-weight:700}
+.exp summary::-webkit-details-marker{display:none}
+.exp summary::after{content:" \25BE"}
+.exp .menu{position:absolute;z-index:5;top:calc(100% + 6px);left:0;min-width:240px;display:grid;gap:2px;background:#fff;border:1px solid var(--line);border-radius:18px;padding:8px;box-shadow:var(--shadow)}
+.exp .menu button{background:transparent;color:var(--deep);box-shadow:none;text-align:left;padding:10px 12px;border-radius:12px}
+.exp .menu button:hover{background:var(--lav2);transform:none}
+.exp .menu small{color:var(--muted);padding:4px 12px 6px;font-size:.8rem}
+#printarea{display:none}
+@page{size:A4 landscape;margin:12mm}
+@media print{
+  .back,.actions,.addbar,.exp,.seg{display:none!important}
+  body{background:#fff}
+  body.print-table #app{display:none!important}
+  body.print-table #printarea{display:block;color:#000;font-family:Arial,sans-serif}
+  #printarea h1{font-family:Arial,sans-serif;font-size:18px;color:#000;margin:0 0 4px}
+  #printarea p{margin:0 0 10px;font-size:11px}
+  #printarea table{width:100%;border-collapse:collapse;font-size:11px}
+  #printarea th,#printarea td{border:1px solid #888;padding:4px 6px;text-align:center}
+  #printarea td.l{text-align:left}
+  #printarea th{background:#e9e0ff}
+  #printarea tr.tot td{font-weight:700;background:#f3eeff}
+}
+.actions .exp{margin:0}
+.actions .exp .menu{top:auto;bottom:calc(100% + 6px)}
